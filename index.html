@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quản lý chi tiêu</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--tx:#1b1f24;--mut:#6b7280;--bd:#e3e6ea;--pri:#0f766e;--red:#dc2626;--grn:#16a34a;--amb:#d97706;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#111418;--card:#1b2026;--tx:#e8eaed;--mut:#9aa3ad;--bd:#2b323a;--pri:#2dd4bf;--red:#f87171;--grn:#4ade80;--amb:#fbbf24;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.wrap{max-width:1000px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0}h2{font-size:15px;margin:0 0 10px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px}
+.grid{display:grid;gap:12px;margin-bottom:12px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.k{color:var(--mut);font-size:12px}.v{font-size:20px;font-weight:700;margin-top:2px}
+input,select,button{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 10px;min-width:0}
+button{cursor:pointer}button:hover{border-color:var(--pri)}
+button.p{background:var(--pri);color:#fff;border-color:var(--pri)}
+@media(prefers-color-scheme:dark){button.p{color:#0b1115}}
+.row{display:flex;flex-wrap:wrap;gap:8px}.row>*{flex:1 1 130px}
+.alert{padding:10px 12px;border-radius:8px;margin-bottom:12px;background:color-mix(in srgb,var(--amb) 18%,transparent);border:1px solid var(--amb)}
+.alert.bad{background:color-mix(in srgb,var(--red) 15%,transparent);border-color:var(--red)}
+.alert.ok{background:color-mix(in srgb,var(--grn) 15%,transparent);border-color:var(--grn)}
+.chart{display:flex;align-items:flex-end;gap:2px;height:140px;position:relative;border-bottom:1px solid var(--bd)}
+.chart i{flex:1;background:var(--pri);border-radius:2px 2px 0 0;min-height:1px;opacity:.85}
+.chart i.low{background:var(--red)}.chart i.fut{opacity:.2}
+.ml{position:absolute;left:0;right:0;border-top:2px dashed var(--amb)}
+.cat{margin:6px 0}.cat div{display:flex;justify-content:space-between;font-size:13px}
+.cat b{display:block;height:6px;border-radius:3px;background:var(--pri);margin-top:3px}
+.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 8px;text-align:left;border-bottom:1px solid var(--bd);white-space:nowrap}
+th{color:var(--mut);font-weight:600;font-size:12px}td.n{text-align:right}
+.chi{color:var(--red)}.thu{color:var(--grn)}
+.sm{padding:3px 8px;font-size:12px}.mut{color:var(--mut);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>💰 Quản lý chi tiêu</h1>
+  <div class="bar">
+    <button class="p" id="bNew">Tạo file Excel</button>
+    <button id="bOpen">Mở file Excel</button>
+    <button id="bDl">Tải .xlsx</button>
+    <input type="file" id="fIn" accept=".xlsx" hidden>
+  </div>
+</header>
+<div class="mut" id="fileSt" style="margin:-6px 0 12px"></div>
+
+<div class="card" style="margin-bottom:12px">
+  <div class="row">
+    <div><div class="k">Tháng</div><input type="month" id="month"></div>
+    <div><div class="k">Thu nhập tháng này (₫)</div><input type="number" id="inc" min="0" step="100000" placeholder="VD: 15000000"></div>
+    <div><div class="k">Chi tối thiểu mỗi ngày (₫)</div><input type="number" id="minD" min="0" step="10000" placeholder="VD: 150000"></div>
+  </div>
+</div>
+
+<div id="alerts"></div>
+<div class="grid g4" id="cards"></div>
+
+<div class="grid g2">
+  <div class="card"><h2>Chi tiêu theo ngày <span class="mut">(đường cam = mức tối thiểu, cột đỏ = dưới mức)</span></h2><div class="chart" id="chart"></div><div class="mut" id="chartAx" style="display:flex;justify-content:space-between"></div></div>
+  <div class="card"><h2>Theo danh mục</h2><div id="cats"></div></div>
+</div>
+
+<div class="card" style="margin-bottom:12px">
+  <h2 id="fTitle">Thêm giao dịch</h2>
+  <div class="row">
+    <input type="date" id="tDate">
+    <select id="tType"><option value="chi">Chi</option><option value="thu">Thu thêm</option></select>
+    <select id="tCat"></select>
+    <input type="number" id="tAmt" min="0" step="1000" placeholder="Số tiền">
+    <input type="text" id="tNote" placeholder="Ghi chú" style="flex:2 1 180px">
+    <button class="p" id="tSave">Lưu</button>
+    <button id="tCancel" hidden>Huỷ</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="row" style="margin-bottom:8px">
+    <h2 style="flex:2 1 150px;margin:0;align-self:center">Giao dịch trong tháng</h2>
+    <input type="search" id="q" placeholder="Tìm kiếm…">
+    <select id="fType"><option value="">Tất cả</option><option value="chi">Chi</option><option value="thu">Thu</option></select>
+  </div>
+  <div class="scroll"><table><thead><tr><th>Ngày</th><th>Loại</th><th>Danh mục</th><th style="text-align:right">Số tiền</th><th>Ghi chú</th><th></th></tr></thead><tbody id="list"></tbody></table></div>
+</div>
+<p class="mut">Dữ liệu luôn được lưu tạm trong trình duyệt. Hãy “Tạo/Mở file Excel” để app tự ghi vào file .xlsx của bạn (Chrome/Edge), hoặc dùng “Tải .xlsx” để sao lưu.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const CATS=['Ăn uống','Di chuyển','Nhà ở','Hóa đơn','Mua sắm','Giải trí','Sức khỏe','Giáo dục','Lương','Khác'];
+const $=id=>document.getElementById(id);
+const fmt=n=>Math.round(n||0).toLocaleString('vi-VN')+' ₫';
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const p2=n=>String(n).padStart(2,'0');
+const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())};
+let S={tx:[],income:{},minDaily:0},fh=null,month=todayStr().slice(0,7),editId=null,t=null;
+
+try{const j=localStorage.getItem('qlct');if(j)S=Object.assign(S,JSON.parse(j))}catch(e){}
+
+/* ---------- Excel database ---------- */
+function toWB(){
+  const wb=XLSX.utils.book_new();
+  const a=[['ID','Ngày','Loại','Danh mục','Số tiền','Ghi chú']].concat(S.tx.map(x=>[x.id,x.date,x.type,x.cat,x.amount,x.note]));
+  const b=[['Tháng','Thu nhập']].concat(Object.entries(S.income).sort().map(([k,v])=>[k,v]));
+  const c=[['Khóa','Giá trị'],['minDaily',S.minDaily]];
+  [['Giao dịch',a],['Thu nhập',b],['Cài đặt',c]].forEach(([n,d])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(d),n));
+  return wb;
+}
+function fromWB(wb){
+  const rows=n=>wb.Sheets[n]?XLSX.utils.sheet_to_json(wb.Sheets[n]):[];
+  S.tx=rows('Giao dịch').map(r=>({id:String(r['ID']||Date.now()+Math.random()),date:String(r['Ngày']||'').slice(0,10),type:r['Loại']==='thu'?'thu':'chi',cat:String(r['Danh mục']||'Khác'),amount:Number(r['Số tiền'])||0,note:String(r['Ghi chú']||'')}));
+  S.income={};rows('Thu nhập').forEach(r=>{S.income[String(r['Tháng']).slice(0,7)]=Number(r['Thu nhập'])||0});
+  const st=rows('Cài đặt').find(r=>r['Khóa']==='minDaily');S.minDaily=st?Number(st['Giá trị'])||0:0;
+}
+async function writeFile(){
+  if(!fh)return;
+  try{const w=await fh.createWritable();await w.write(XLSX.write(toWB(),{type:'array',bookType:'xlsx'}));await w.close();$('fileSt').textContent='✓ Đã lưu vào '+fh.name+' lúc '+new Date().toLocaleTimeString('vi-VN')}
+  catch(e){$('fileSt').textContent='⚠ Không ghi được file: '+e.message}
+}
+function save(){
+  try{localStorage.setItem('qlct',JSON.stringify(S))}catch(e){}
+  clearTimeout(t);t=setTimeout(writeFile,500);
+}
+const picker={types:[{description:'Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]};
+$('bNew').onclick=async()=>{
+  if(!window.showSaveFilePicker){alert('Trình duyệt chưa hỗ trợ ghi file trực tiếp. Hãy dùng Chrome/Edge, hoặc nhấn “Tải .xlsx”.');return}
+  try{fh=await showSaveFilePicker(Object.assign({suggestedName:'chi-tieu.xlsx'},picker));await writeFile()}catch(e){}
+};
+$('bOpen').onclick=async()=>{
+  if(window.showOpenFilePicker){
+    try{[fh]=await showOpenFilePicker(picker);const f=await fh.getFile();fromWB(XLSX.read(await f.arrayBuffer()));$('fileSt').textContent='✓ Đang dùng file '+fh.name;save();render()}catch(e){}
+  }else $('fIn').click();
+};
+$('fIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;fromWB(XLSX.read(await f.arrayBuffer()));fh=null;$('fileSt').textContent='Đã nạp '+f.name+' (chế độ chỉ đọc/ghi tạm, dùng “Tải .xlsx” để lưu)';save();render()};
+$('bDl').onclick=()=>XLSX.writeFile(toWB(),'chi-tieu.xlsx');
+
+/* ---------- Logic ---------- */
+const dim=m=>new Date(+m.slice(0,4),+m.slice(5,7),0).getDate();
+function calc(){
+  const tx=S.tx.filter(x=>x.date.startsWith(month));
+  const base=S.income[month]||0,extra=tx.filter(x=>x.type==='thu').reduce((s,x)=>s+x.amount,0);
+  const income=base+extra,spent=tx.filter(x=>x.type==='chi').reduce((s,x)=>s+x.amount,0);
+  const days=dim(month),min=S.minDaily||0,balance=income-spent;
+  const td=todayStr(),cur=td.startsWith(month),past=month<td.slice(0,7);
+  const dayNo=cur?+td.slice(8):(past?days+1:0);
+  const remain=cur?days-dayNo+1:(past?0:days);
+  const perDay=remain>0?balance/remain:0;
+  const byDay=Array(days).fill(0),byCat={};
+  tx.filter(x=>x.type==='chi').forEach(x=>{byDay[+x.date.slice(8,10)-1]+=x.amount;byCat[x.cat]=(byCat[x.cat]||0)+x.amount});
+  return{tx,base,extra,income,spent,days,min,balance,cur,past,dayNo,remain,perDay,byDay,byCat,reserve:min*days,free:income-min*days,todaySpent:cur?byDay[dayNo-1]:0};
+}
+
+/* ---------- Render ---------- */
+function render(){
+  const c=calc();
+  $('month').value=month;$('inc').value=S.income[month]||'';$('minD').value=S.minDaily||'';
+  const card=(k,v,cls='')=>`<div class="card"><div class="k">${k}</div><div class="v ${cls}">${v}</div></div>`;
+  $('cards').innerHTML=
+    card('Tổng thu (gồm thu thêm '+fmt(c.extra)+')',fmt(c.income),'thu')+
+    card('Đã chi',fmt(c.spent),'chi')+
+    card('Còn lại',fmt(c.balance),c.balance<0?'chi':'')+
+    card('Dành riêng cho chi tối thiểu ('+c.days+' ngày)',fmt(c.reserve))+
+    card('Có thể chi tự do trong tháng',fmt(c.free),c.free<0?'chi':'')+
+    (c.cur?card('Hạn mức/ngày còn lại ('+c.remain+' ngày)',fmt(Math.max(c.perDay,0))):card('Chi trung bình/ngày',fmt(c.spent/c.days)));
+  let al='';
+  if(!c.income)al+='<div class="alert">Hãy nhập thu nhập tháng này để app tính ngân sách.</div>';
+  else if(c.min&&c.free<0)al+=`<div class="alert bad">Thu nhập chưa đủ trang trải mức chi tối thiểu cả tháng (thiếu ${fmt(-c.free)}).</div>`;
+  if(c.cur&&c.min&&c.income){
+    if(c.balance<=0)al+='<div class="alert bad">Bạn đã chi hết ngân sách tháng này.</div>';
+    else if(c.perDay<c.min)al+=`<div class="alert bad">Hạn mức mỗi ngày còn lại (${fmt(c.perDay)}) thấp hơn mức tối thiểu ${fmt(c.min)}. Cần giảm chi hoặc bổ sung thu nhập.</div>`;
+    else al+=`<div class="alert ok">Hôm nay đã chi ${fmt(c.todaySpent)}; mức tối thiểu ${fmt(c.min)}. Hạn mức an toàn mỗi ngày còn lại: ${fmt(c.perDay)}.</div>`;
+  }
+  $('alerts').innerHTML=al;
+  const mx=Math.max(c.min,...c.byDay,1);
+  $('chart').innerHTML=c.byDay.map((v,i)=>{const fut=c.cur?i+1>c.dayNo:!c.past;const low=!fut&&c.min&&v<c.min;return`<i class="${low?'low':''} ${fut?'fut':''}" style="height:${v/mx*100}%" title="Ngày ${i+1}: ${fmt(v)}"></i>`}).join('')+(c.min?`<div class="ml" style="bottom:${c.min/mx*100}%"></div>`:'');
+  $('chartAx').innerHTML=`<span>1</span><span>${Math.ceil(c.days/2)}</span><span>${c.days}</span>`;
+  const ce=Object.entries(c.byCat).sort((a,b)=>b[1]-a[1]),cm=ce.length?ce[0][1]:1;
+  $('cats').innerHTML=ce.length?ce.map(([k,v])=>`<div class="cat"><div><span>${esc(k)}</span><span>${fmt(v)} · ${Math.round(v/c.spent*100)}%</span></div><b style="width:${v/cm*100}%"></b></div>`).join(''):'<div class="mut">Chưa có khoản chi nào.</div>';
+  const q=$('q').value.toLowerCase(),ft=$('fType').value;
+  const rows=c.tx.filter(x=>(!ft||x.type===ft)&&(!q||(x.note+x.cat).toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));
+  $('list').innerHTML=rows.length?rows.map(x=>`<tr><td>${x.date.slice(8)}/${x.date.slice(5,7)}</td><td class="${x.type}">${x.type==='chi'?'Chi':'Thu'}</td><td>${esc(x.cat)}</td><td class="n ${x.type}">${x.type==='chi'?'−':'+'}${fmt(x.amount)}</td><td>${esc(x.note)}</td><td><button class="sm" onclick="edit('${x.id}')">Sửa</button> <button class="sm" onclick="del('${x.id}')">Xoá</button></td></tr>`).join(''):'<tr><td colspan="6" class="mut">Không có giao dịch.</td></tr>';
+}
+
+/* ---------- Actions ---------- */
+$('tCat').innerHTML=CATS.map(c=>`<option>${c}</option>`).join('');
+$('tDate').value=todayStr();
+$('month').onchange=e=>{if(e.target.value){month=e.target.value;render()}};
+$('inc').onchange=e=>{S.income[month]=Math.max(0,+e.target.value||0);save();render()};
+$('minD').onchange=e=>{S.minDaily=Math.max(0,+e.target.value||0);save();render()};
+$('q').oninput=$('fType').onchange=render;
+function resetForm(){editId=null;$('fTitle').textContent='Thêm giao dịch';$('tCancel').hidden=true;$('tAmt').value='';$('tNote').value=''}
+$('tSave').onclick=()=>{
+  const amount=+$('tAmt').value,date=$('tDate').value;
+  if(!date||!(amount>0)){alert('Vui lòng nhập ngày và số tiền hợp lệ.');return}
+  const o={date,type:$('tType').value,cat:$('tCat').value,amount,note:$('tNote').value.trim()};
+  if(editId){Object.assign(S.tx.find(x=>x.id===editId),o)}else S.tx.push(Object.assign({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6)},o));
+  month=date.slice(0,7);resetForm();save();render();
+};
+$('tCancel').onclick=resetForm;
+window.edit=id=>{const x=S.tx.find(v=>v.id===id);if(!x)return;editId=id;$('tDate').value=x.date;$('tType').value=x.type;$('tCat').value=x.cat;$('tAmt').value=x.amount;$('tNote').value=x.note;$('fTitle').textContent='Sửa giao dịch';$('tCancel').hidden=false;scrollTo({top:0,behavior:'smooth'})};
+window.del=id=>{if(confirm('Xoá giao dịch này?')){S.tx=S.tx.filter(x=>x.id!==id);save();render()}};
+render();
+</script>
+</body>
+</html>
